@@ -60,137 +60,13 @@ jobs:
         name: Run unit tests
         run: |
           go test -v ./...
-  
-  acctest:
-    name: Acceptance test (${{ matrix.target.name }})
-    
-    needs: build
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-
-    permissions:
-      contents: read
-      packages: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - 
-            name: alpine
-            image: ghcr.io/neuspaces/terraform-provider-system_v0.1.0/alpine-acctest
-            image_tag: 13cdac2
-            test_path: test/alpine
-            host_port: 10022
-            private_key_file: root-ed25519
-            extra_run_args: --tmpfs /tmp --tmpfs /run -v /sys/fs/cgroup:/sys/fs/cgroup:ro
-          - 
-            name: debian
-            image: ghcr.io/neuspaces/terraform-provider-system_v0.1.0/debian-acctest
-            image_tag: 560b08f
-            test_path: test/debian
-            host_port: 11022
-            private_key_file: root-ed25519
-            extra_run_args: --tmpfs /tmp --tmpfs /run --tmpfs /run/lock --mount type=bind,source=/sys/fs/cgroup,target=/sys/fs/cgroup --cgroupns=host
-          - 
-            name: fedora
-            image: ghcr.io/neuspaces/terraform-provider-system_v0.1.0/fedora-acctest
-            image_tag: e3d717a
-            test_path: test/fedora
-            host_port: 12022
-            private_key_file: root-ed25519
-            extra_run_args: --tmpfs /tmp --tmpfs /run --tmpfs /run/lock --mount type=bind,source=/sys/fs/cgroup,target=/sys/fs/cgroup --cgroupns=host
-        terraform_version:
-          # - '0.14.11'
-          # - '0.15.5'
-          # - '1.0.7'
-          # - '1.1.7'
-          # - '1.1.9'
-          # - '1.2.8'
-          - '1.6.3'
-    
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v4.1.6
-      
-      - 
-        name: Context variables
-        id: vars
-        run: |
-          echo "os_container_name=terraform-provider-system-${{ matrix.target.name }}-${{ github.run_id }}" >> $GITHUB_OUTPUT
-      
-      -
-        name: Set up Go
-        uses: actions/setup-go@v5.0.1
-        with:
-          go-version: '1.22.3'
-
-      -
-        name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      -
-        # Note: services cannot be used for the purpose of running the test os container because, required files from the repository checkout are not available at the time the service containers are started
-        name: Start ${{ matrix.target.name }} container
-        id: start_os_container
-        run: >
-          sudo chown root:root ${{ github.workspace }}/${{ matrix.target.test_path }}/${{ matrix.target.private_key_file }}.pub;
-          sudo chmod 600 ${{ matrix.target.test_path }}/${{ matrix.target.private_key_file }} ${{ matrix.target.test_path }}/${{ matrix.target.private_key_file }}.pub;
-          docker run
-          --detach
-          --rm
-          --name '${{ steps.vars.outputs.os_container_name }}'
-          --env 'SSH_ENABLE_ROOT_PASSWORD_AUTH=true'
-          --env 'SSH_ENABLE_PASSWORD_AUTH=true'
-          --env 'TCP_FORWARDING=true'
-          --publish ${{ matrix.target.host_port }}:22
-          --mount type=bind,source=${{ github.workspace }}/${{ matrix.target.test_path }}/${{ matrix.target.private_key_file }}.pub,target=/etc/authorized_keys/root,readonly
-          --mount type=bind,source=${{ github.workspace }}/${{ matrix.target.test_path }}/hostkeys,target=/etc/ssh/keys
-          ${{ matrix.target.extra_run_args }}
-          ${{ matrix.target.image }}:${{ matrix.target.image_tag }}
-
-      - 
-        name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3.1.1
-        with:
-          terraform_version: ${{ matrix.terraform_version }}
-
-      -
-        name: Run acceptance tests
-        env:
-          TF_ACC: "1"
-          TF_LOG: "DEBUG"
-          TF_ACC_TERRAFORM_PATH: ${{ steps.terraform_cli.outputs.path }}
-          TF_ACC_PROVIDER_SYSTEM_TARGETS: ${{ matrix.target.name }}
-        run: |
-          go test -v ./internal/provider/
-
-      -
-        name: Logs of ${{ matrix.target.name }} container
-        if: ${{ always() && steps.start_os_container.outcome == 'success' }}
-        continue-on-error: true
-        run: >
-          docker logs '${{ steps.vars.outputs.os_container_name }}'
-
-      -
-        name: Stop ${{ matrix.target.name }} container
-        if: ${{ always() && steps.start_os_container.outcome == 'success' }}
-        continue-on-error: true
-        run: >
-          docker stop --time 30 '${{ steps.vars.outputs.os_container_name }}'
 
   release:
     name: Release
     
     # only on push events and if commit has version tag
-    if: ${{ github.repository == 'neuspaces/terraform-provider-system_v0.1.0' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ github.repository == 'stevenbuglione/terraform-provider-system' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
 
-    needs: acctest
     runs-on: ubuntu-22.04
     timeout-minutes: 15
 
@@ -210,19 +86,8 @@ jobs:
           go-version: '1.22.3'
 
       -
-        name: Import GPG private key
-        id: import_gpg_private_key
-        uses: neuspaces/gpg-key-action@v6.1.0
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      
-      -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2.9.1
         with:
           version: latest
           args: release --rm-dist
-        env:
-          GPG_FINGERPRINT: ${{ steps.import_gpg_private_key.outputs.fingerprint }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

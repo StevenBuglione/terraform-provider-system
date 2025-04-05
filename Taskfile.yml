@@ -41,7 +41,7 @@ tasks:
   go-doc:
     desc: Run documentation server for Go programs
     cmds:
-      - echo "Open documentation at http://127.0.0.1:10080/pkg/github.com/neuspaces/terraform-provider-system"
+      - echo "Open documentation at http://127.0.0.1:10080/pkg/github.com/neuspaces/terraform-provider-system_v0.1.0"
       - godoc -http "127.0.0.1:10080" -index -goroot .
 
   tf-fmt:
@@ -89,7 +89,7 @@ tasks:
     env:
       TF_ACC: true
     cmds:
-      - go test -run '^TestAcc' github.com/neuspaces/terraform-provider-system/internal/provider
+      - go test -run '^TestAcc' github.com/neuspaces/terraform-provider-system_v0.1.0/internal/provider
 
   test:
     desc: Run provider unit tests

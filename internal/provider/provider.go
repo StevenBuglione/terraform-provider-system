@@ -48,6 +48,7 @@ func providerResources() map[string]*schema.Resource {
 		resourceSystemdUnitName:    resourceSystemdUnit(),
 		resourcePackagesApkName:    resourcePackagesApk(),
 		resourcePackagesAptName:    resourcePackagesApt(),
+		resourcePackagesSnapName:   resourcePackagesSnap(),
 	}
 }
 

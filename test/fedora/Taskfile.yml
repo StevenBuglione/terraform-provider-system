@@ -6,12 +6,12 @@ vars:
 
   OS_NAME: fedora
 
-  CONTAINER_NAME: terraform-provider-system-{{.OS_NAME}}
+  CONTAINER_NAME: terraform-provider-system_v0.1.0-{{.OS_NAME}}
 
   HOST_SSH_PORT: 12022
   HOST_HTTP_PORT: 12080
 
-  IMAGE_NAME: terraform-provider-system-{{.OS_NAME}}
+  IMAGE_NAME: terraform-provider-system_v0.1.0-{{.OS_NAME}}
   IMAGE_TAG: latest
 
 tasks:  
